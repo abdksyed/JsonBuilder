@@ -146,7 +146,7 @@ Stage 2: Intelligent Re-ranking (LLM/Re-ranker) → Best Schema Selection
 
 ### Stage 1: Hybrid Retrieval System
 
-#### Vector Similarity Search
+#### Vector Similarity Search (DONE)
 ```python
 # Pre-computed schema embeddings for semantic matching
 schema_embeddings = embed_text([schema.summary for schema in all_schemas])
@@ -155,7 +155,7 @@ similarity_scores = cosine_similarity(query_embedding, schema_embeddings)
 top_semantic_matches = get_top_k(similarity_scores, k=20)
 ```
 
-#### BM25 Keyword Search
+#### BM25 Keyword Search (TODO)
 ```python
 # Traditional keyword matching for exact term overlap
 bm25_index = build_bm25_index([schema.summary + schema.title for schema in schemas])
@@ -163,7 +163,7 @@ bm25_scores = bm25_index.get_scores(input_text)
 top_keyword_matches = get_top_k(bm25_scores, k=20)
 ```
 
-#### Metadata Filtering
+#### Metadata Filtering (TODO)
 ```python
 # Fast pre-filtering based on domain, category, tags
 def filter_by_metadata(text: str, schemas: List[Schema]) -> List[Schema]:
@@ -176,7 +176,7 @@ def filter_by_metadata(text: str, schemas: List[Schema]) -> List[Schema]:
            any(tag in text.lower() for tag in s.tags)]
 ```
 
-#### Hybrid Ranking Strategy
+#### Hybrid Ranking Strategy (TODO)
 ```python
 def hybrid_rank(embedding_results, bm25_results, metadata_results, weights=(0.5, 0.3, 0.2)):
     combined_scores = {}
@@ -248,7 +248,9 @@ CREATE TABLE schema_metadata (
 
 ## Todo Enhancements Pipeline
 
-### Phase 1: Re-ranker Integration
+### Phase 1: Building Metadata and Database for Dense Embedding and BM25 Search
+
+### Phase 2: Re-ranker Integration
 ```python
 class RerankerService:
     def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-12-v2"):
@@ -259,13 +261,3 @@ class RerankerService:
         scores = self.model.predict(pairs)
         return sorted(zip(candidates, scores), key=lambda x: x[1], reverse=True)
 ```
-
-### Phase 2: Advanced Hybrid Search
-- **Dense + Sparse**: Combine BERT embeddings with learned sparse representations
-- **Multi-Modal**: Include schema structure patterns in embedding computation
-- **Adaptive Weights**: Learn optimal combination weights from user feedback
-
-### Phase 3: Production Infrastructure
-- **Vector Database**: Migration to Pinecone/Weaviate for production-scale vector search
-- **Load Balancing**: Distribute retrieval and re-ranking across multiple instances  
-- **Monitoring**: Real-time metrics for retrieval precision@K and end-to-end latency
