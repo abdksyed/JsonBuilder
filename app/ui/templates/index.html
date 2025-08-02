@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schema-Aware JSON Extractor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">Schema-Aware JSON Extractor</h1>
+        
+        <div class="max-w-4xl mx-auto">
+            <!-- Tab Navigation -->
+            <div class="mb-6">
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8">
+                        <button id="manual-tab" class="tab-button active py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
+                            Manual Schema
+                        </button>
+                        <button id="auto-tab" class="tab-button py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                            Auto-Detect (Coming Soon)
+                        </button>
+                        <button id="add-schema-tab" class="tab-button py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                            Add Schema
+                        </button>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Manual Schema Tab -->
+            <div id="manual-content" class="tab-content">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Input Section -->
+                    <div class="space-y-4">
+                        <div>
+                            <label for="text-input" class="block text-sm font-medium text-gray-700 mb-2">
+                                Input Text
+                            </label>
+                            <textarea id="text-input" 
+                                    class="w-full h-40 p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                                    placeholder="Enter the text you want to extract JSON from..."></textarea>
+                        </div>
+                        
+                        <div>
+                            <label for="schema-select" class="block text-sm font-medium text-gray-700 mb-2">
+                                Select Schema
+                            </label>
+                            <select id="schema-select" 
+                                    class="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">Loading schemas...</option>
+                            </select>
+                        </div>
+                        
+                        <button id="extract-btn" 
+                                class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 font-medium">
+                            Extract JSON
+                        </button>
+                    </div>
+
+                    <!-- Output Section -->
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-sm font-medium text-gray-700">
+                                Extracted JSON
+                            </label>
+                            <div id="validation-badge" class="hidden">
+                                <span id="valid-badge" class="hidden inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    ✅ Valid
+                                </span>
+                                <span id="invalid-badge" class="hidden inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    ❌ Invalid
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="relative">
+                            <pre id="json-output" 
+                                 class="w-full h-40 p-3 bg-gray-50 border border-gray-300 rounded-md font-mono text-sm overflow-auto"></pre>
+                            <button id="copy-btn" 
+                                    class="hidden absolute top-2 right-2 bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded text-xs">
+                                Copy
+                            </button>
+                        </div>
+                        
+                        <div id="metadata" class="hidden text-sm text-gray-600">
+                            <p>Attempts: <span id="attempts-count">-</span></p>
+                            <p id="error-message" class="hidden text-red-600"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auto-Detect Tab (Placeholder) -->
+            <div id="auto-content" class="tab-content hidden">
+                <div class="text-center py-12">
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Auto-Detection Coming Soon</h3>
+                    <p class="text-gray-600">This feature will automatically select the best schema based on your input text.</p>
+                </div>
+            </div>
+
+            <!-- Add Schema Tab -->
+            <div id="add-schema-content" class="tab-content hidden">
+                <div class="max-w-2xl mx-auto">
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-6">Create New Schema</h3>
+                        
+                        <form id="schema-form" class="space-y-4">
+                            <div>
+                                <label for="schema-title" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Schema Title
+                                </label>
+                                <input type="text" id="schema-title" 
+                                       class="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                       placeholder="e.g., Person Information"
+                                       required>
+                            </div>
+                            
+                            <div>
+                                <label for="schema-summary" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Summary
+                                </label>
+                                <textarea id="schema-summary" 
+                                          class="w-full h-20 p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 resize-vertical"
+                                          placeholder="Brief description of what this schema extracts"
+                                          required></textarea>
+                            </div>
+                            
+                            
+                            <div>
+                                <label for="schema-json" class="block text-sm font-medium text-gray-700 mb-2">
+                                    JSON Schema
+                                </label>
+                                <textarea id="schema-json" 
+                                          class="w-full h-64 p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                                          placeholder='Enter your JSON schema here, e.g.:
+{
+  "type": "object",
+  "properties": {
+    "name": {"type": "string"},
+    "age": {"type": "number"}
+  },
+  "required": ["name"]
+}'
+                                          required></textarea>
+                                <p class="mt-1 text-sm text-gray-500">Enter a valid JSON Schema (Draft 7)</p>
+                            </div>
+                            
+                            <div class="flex space-x-3">
+                                <button type="submit" id="create-schema-btn"
+                                        class="flex-1 bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 font-medium">
+                                    Create Schema
+                                </button>
+                                <button type="button" id="validate-schema-btn"
+                                        class="px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 font-medium">
+                                    Validate
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <div id="schema-feedback" class="mt-4 hidden">
+                            <div id="schema-success" class="hidden p-3 bg-green-100 border border-green-400 text-green-700 rounded-md">
+                                <p class="font-medium">✅ Schema created successfully!</p>
+                                <p class="text-sm mt-1">ID: <span id="created-schema-id"></span></p>
+                            </div>
+                            <div id="schema-error" class="hidden p-3 bg-red-100 border border-red-400 text-red-700 rounded-md">
+                                <p class="font-medium">❌ Error</p>
+                                <p class="text-sm mt-1" id="schema-error-message"></p>
+                            </div>
+                            <div id="schema-validation" class="hidden p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded-md">
+                                <p class="font-medium">✅ Schema is valid!</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Example Schema Templates -->
+                    <div class="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <h4 class="text-md font-medium text-gray-900 mb-4">Example Schema Templates</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button class="schema-template text-left p-3 border border-gray-200 rounded-md hover:bg-gray-50"
+                                    data-title="Person Information"
+                                    data-summary="Extract person details like name, age, email"
+                                    data-schema='{"type": "object", "properties": {"name": {"type": "string"}, "age": {"type": "number"}, "email": {"type": "string", "format": "email"}}, "required": ["name"]}'>
+                                <div class="font-medium text-gray-900">Person Information</div>
+                                <div class="text-sm text-gray-600">Name, age, email extraction</div>
+                            </button>
+                            
+                            <button class="schema-template text-left p-3 border border-gray-200 rounded-md hover:bg-gray-50"
+                                    data-title="Product Information"
+                                    data-summary="Extract product details like name, price, description"
+                                    data-schema='{"type": "object", "properties": {"name": {"type": "string"}, "price": {"type": "number"}, "description": {"type": "string"}, "category": {"type": "string"}}, "required": ["name", "price"]}'>
+                                <div class="font-medium text-gray-900">Product Information</div>
+                                <div class="text-sm text-gray-600">Product name, price, description</div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab functionality
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const tabId = button.id;
+                let contentId;
+                
+                switch(tabId) {
+                    case 'manual-tab':
+                        contentId = 'manual-content';
+                        break;
+                    case 'auto-tab':
+                        contentId = 'auto-content';
+                        break;
+                    case 'add-schema-tab':
+                        contentId = 'add-schema-content';
+                        break;
+                }
+                
+                // Update tab buttons
+                document.querySelectorAll('.tab-button').forEach(b => {
+                    b.classList.remove('active', 'border-blue-500', 'text-blue-600');
+                    b.classList.add('border-transparent', 'text-gray-500');
+                });
+                button.classList.add('active', 'border-blue-500', 'text-blue-600');
+                button.classList.remove('border-transparent', 'text-gray-500');
+                
+                // Update content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById(contentId).classList.remove('hidden');
+            });
+        });
+
+        // Load schemas
+        async function loadSchemas() {
+            try {
+                const response = await axios.get('/schemas');
+                const select = document.getElementById('schema-select');
+                select.innerHTML = '<option value="">Select a schema...</option>';
+                
+                response.data.schemas.forEach(schema => {
+                    const option = document.createElement('option');
+                    option.value = schema.id;
+                    option.textContent = `${schema.title} - ${schema.summary}`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load schemas:', error);
+                document.getElementById('schema-select').innerHTML = '<option value="">Failed to load schemas</option>';
+            }
+        }
+
+        // Extract JSON
+        async function extractJSON() {
+            const text = document.getElementById('text-input').value.trim();
+            const schemaId = document.getElementById('schema-select').value;
+            
+            if (!text || !schemaId) {
+                alert('Please enter text and select a schema');
+                return;
+            }
+            
+            const button = document.getElementById('extract-btn');
+            button.disabled = true;
+            button.textContent = 'Extracting...';
+            
+            try {
+                const response = await axios.post('/extract', {
+                    text: text,
+                    schema_id: schemaId
+                });
+                
+                const result = response.data;
+                
+                // Display JSON
+                document.getElementById('json-output').textContent = JSON.stringify(result.data, null, 2);
+                
+                // Show validation badge
+                const validBadge = document.getElementById('valid-badge');
+                const invalidBadge = document.getElementById('invalid-badge');
+                const badge = document.getElementById('validation-badge');
+                
+                badge.classList.remove('hidden');
+                if (result.valid) {
+                    validBadge.classList.remove('hidden');
+                    invalidBadge.classList.add('hidden');
+                } else {
+                    validBadge.classList.add('hidden');
+                    invalidBadge.classList.remove('hidden');
+                }
+                
+                // Show metadata
+                document.getElementById('attempts-count').textContent = result.attempts;
+                const metadata = document.getElementById('metadata');
+                metadata.classList.remove('hidden');
+                
+                const errorMsg = document.getElementById('error-message');
+                if (result.error) {
+                    errorMsg.textContent = `Error: ${result.error}`;
+                    errorMsg.classList.remove('hidden');
+                } else {
+                    errorMsg.classList.add('hidden');
+                }
+                
+                // Show copy button
+                document.getElementById('copy-btn').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Extraction failed:', error);
+                document.getElementById('json-output').textContent = 'Extraction failed: ' + error.response?.data?.detail || error.message;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Extract JSON';
+            }
+        }
+
+        // Copy to clipboard
+        function copyToClipboard() {
+            const output = document.getElementById('json-output').textContent;
+            navigator.clipboard.writeText(output).then(() => {
+                const button = document.getElementById('copy-btn');
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                setTimeout(() => button.textContent = originalText, 2000);
+            });
+        }
+
+        // Schema validation
+        function validateSchema() {
+            const schemaText = document.getElementById('schema-json').value.trim();
+            
+            if (!schemaText) {
+                showSchemaFeedback('error', 'Please enter a schema');
+                return false;
+            }
+            
+            try {
+                const schema = JSON.parse(schemaText);
+                showSchemaFeedback('validation', 'Schema is valid JSON');
+                return true;
+            } catch (e) {
+                showSchemaFeedback('error', `Invalid JSON: ${e.message}`);
+                return false;
+            }
+        }
+
+        // Create schema
+        async function createSchema(event) {
+            event.preventDefault();
+            
+            const title = document.getElementById('schema-title').value.trim();
+            const summary = document.getElementById('schema-summary').value.trim();
+            const schemaText = document.getElementById('schema-json').value.trim();
+            
+            if (!title || !summary || !schemaText) {
+                showSchemaFeedback('error', 'Please fill in all fields');
+                return;
+            }
+            
+            let schemaData;
+            try {
+                schemaData = JSON.parse(schemaText);
+            } catch (e) {
+                showSchemaFeedback('error', `Invalid JSON: ${e.message}`);
+                return;
+            }
+            
+            const button = document.getElementById('create-schema-btn');
+            button.disabled = true;
+            button.textContent = 'Creating...';
+            
+            try {
+                const response = await axios.post('/schemas', {
+                    title: title,
+                    summary: summary,
+                    schema_data: schemaData
+                });
+                
+                const result = response.data;
+                document.getElementById('created-schema-id').textContent = result.id;
+                showSchemaFeedback('success', 'Schema created successfully');
+                
+                // Clear form
+                document.getElementById('schema-form').reset();
+                
+                // Reload schemas in the manual tab
+                loadSchemas();
+                
+            } catch (error) {
+                console.error('Schema creation failed:', error);
+                const errorMsg = error.response?.data?.detail || error.message;
+                showSchemaFeedback('error', errorMsg);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Create Schema';
+            }
+        }
+
+        // Show schema feedback
+        function showSchemaFeedback(type, message) {
+            const feedbackContainer = document.getElementById('schema-feedback');
+            const successDiv = document.getElementById('schema-success');
+            const errorDiv = document.getElementById('schema-error');
+            const validationDiv = document.getElementById('schema-validation');
+            
+            // Hide all feedback types
+            successDiv.classList.add('hidden');
+            errorDiv.classList.add('hidden');
+            validationDiv.classList.add('hidden');
+            
+            // Show the appropriate feedback
+            feedbackContainer.classList.remove('hidden');
+            
+            if (type === 'success') {
+                successDiv.classList.remove('hidden');
+            } else if (type === 'error') {
+                document.getElementById('schema-error-message').textContent = message;
+                errorDiv.classList.remove('hidden');
+            } else if (type === 'validation') {
+                validationDiv.classList.remove('hidden');
+            }
+        }
+
+        // Load schema template
+        function loadTemplate(button) {
+            const title = button.dataset.title;
+            const summary = button.dataset.summary;
+            const schema = button.dataset.schema;
+            
+            document.getElementById('schema-title').value = title;
+            document.getElementById('schema-summary').value = summary;
+            document.getElementById('schema-json').value = JSON.stringify(JSON.parse(schema), null, 2);
+            
+            // Hide feedback
+            document.getElementById('schema-feedback').classList.add('hidden');
+        }
+
+        // Event listeners
+        document.getElementById('extract-btn').addEventListener('click', extractJSON);
+        document.getElementById('copy-btn').addEventListener('click', copyToClipboard);
+        document.getElementById('schema-form').addEventListener('submit', createSchema);
+        document.getElementById('validate-schema-btn').addEventListener('click', validateSchema);
+        
+        // Template button listeners
+        document.querySelectorAll('.schema-template').forEach(button => {
+            button.addEventListener('click', () => loadTemplate(button));
+        });
+
+        // Initialize
+        loadSchemas();
+    </script>
+</body>
+</html>

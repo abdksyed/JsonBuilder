@@ -1,0 +1,32 @@
+{
+  "id": "product-info-001",
+  "title": "Product Information",
+  "summary": "Extract product details like name, price, description",
+  "schema_data": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Product name"
+      },
+      "price": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Product price"
+      },
+      "description": {
+        "type": "string",
+        "description": "Product description"
+      },
+      "category": {
+        "type": "string",
+        "description": "Product category"
+      },
+      "in_stock": {
+        "type": "boolean",
+        "description": "Whether the product is in stock"
+      }
+    },
+    "required": ["name", "price"]
+  }
+}

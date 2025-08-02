@@ -1,0 +1,30 @@
+{
+  "id": "person-info-001",
+  "title": "Person Information",
+  "summary": "Extract person details like name, age, email",
+  "schema_data": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Full name of the person"
+      },
+      "age": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 150,
+        "description": "Age in years"
+      },
+      "email": {
+        "type": "string",
+        "format": "email",
+        "description": "Email address"
+      },
+      "phone": {
+        "type": "string",
+        "description": "Phone number"
+      }
+    },
+    "required": ["name"]
+  }
+}
