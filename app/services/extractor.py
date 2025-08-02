@@ -6,6 +6,7 @@ import os
 import logging
 import time
 import re
+import numpy as np
 from abc import ABC, abstractmethod
 from app.models import SchemaMeta
 
@@ -118,6 +119,137 @@ def create_slug(text: str) -> str:
     slug = re.sub(r'[^a-z0-9-]', '-', slug)
     slug = re.sub(r'-+', '-', slug).strip('-')
     return slug
+
+
+def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """Calculate cosine similarity between two vectors."""
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+
+class EmbeddingManager:
+    """Manages schema embeddings for large-scale similarity search."""
+    
+    def __init__(self, extractor=None):
+        self.extractor = extractor
+        self.embeddings_file = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), 'data', 'schema_embeddings.npz'
+        )
+        self.schema_embeddings = None
+        self.schema_ids = None
+        self._ensure_data_directory()
+    
+    def _ensure_data_directory(self):
+        """Ensure data directory exists."""
+        data_dir = os.path.dirname(self.embeddings_file)
+        os.makedirs(data_dir, exist_ok=True)
+    
+    async def _generate_embedding(self, text: str) -> np.ndarray:
+        """Generate embedding for text using text-embedding-004."""
+        if not self.extractor:
+            raise ValueError("Extractor client not available for embedding generation")
+        
+        try:
+            response = self.extractor.client.models.embed_content(
+                model="text-embedding-004",
+                contents=text
+            )
+            return np.array(response.embeddings[0].values)
+        except Exception as e:
+            logger.error(f"Failed to generate embedding: {e}")
+            raise
+    
+    async def build_embeddings(self, schemas: List[SchemaMeta]) -> None:
+        """Build and save embeddings for all schemas."""
+        logger.info(f"Building embeddings for {len(schemas)} schemas")
+        
+        embeddings = []
+        schema_ids = []
+        
+        for schema in schemas:
+            # Create text to embed: title + summary for richer context
+            embed_text = f"{schema.title}. {schema.summary}"
+            
+            try:
+                embedding = await self._generate_embedding(embed_text)
+                embeddings.append(embedding)
+                schema_ids.append(schema.id)
+                logger.debug(f"Generated embedding for schema: {schema.id}")
+            except Exception as e:
+                logger.error(f"Failed to generate embedding for schema {schema.id}: {e}")
+                continue
+        
+        if embeddings:
+            # Save embeddings and IDs
+            embeddings_matrix = np.array(embeddings)
+            np.savez(self.embeddings_file, 
+                    embeddings=embeddings_matrix, 
+                    schema_ids=np.array(schema_ids))
+            
+            # Load into memory
+            self.schema_embeddings = embeddings_matrix
+            self.schema_ids = np.array(schema_ids)
+            
+            logger.info(f"Saved {len(embeddings)} embeddings to {self.embeddings_file}")
+        else:
+            logger.warning("No embeddings were generated")
+    
+    def load_embeddings(self) -> bool:
+        """Load embeddings from file into memory."""
+        if not os.path.exists(self.embeddings_file):
+            logger.info("No embeddings file found, will need to build embeddings")
+            return False
+        
+        try:
+            data = np.load(self.embeddings_file)
+            self.schema_embeddings = data['embeddings']
+            self.schema_ids = data['schema_ids']
+            logger.info(f"Loaded {len(self.schema_embeddings)} embeddings from file")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to load embeddings: {e}")
+            return False
+    
+    async def find_best_schema(self, text: str, available_schemas: List[SchemaMeta], top_k: int = 1) -> List[str]:
+        """Find best matching schemas using embedding similarity."""
+        if self.schema_embeddings is None:
+            logger.warning("No embeddings available, rebuilding...")
+            await self.build_embeddings(available_schemas)
+            if self.schema_embeddings is None:
+                raise ValueError("Failed to build embeddings")
+        
+        # Generate embedding for input text
+        input_embedding = await self._generate_embedding(text[:2000])  # Limit text length
+        
+        # Calculate similarities with all schema embeddings
+        similarities = []
+        available_ids = {schema.id for schema in available_schemas}
+        
+        for i, schema_id in enumerate(self.schema_ids):
+            if schema_id in available_ids:  # Only consider available schemas
+                similarity = cosine_similarity(input_embedding, self.schema_embeddings[i])
+                similarities.append((similarity, schema_id))
+        
+        if not similarities:
+            logger.warning("No matching schemas found in embeddings")
+            return []
+        
+        # Sort by similarity and return top_k
+        similarities.sort(reverse=True, key=lambda x: x[0])
+        top_schemas = [schema_id for _, schema_id in similarities[:top_k]]
+        
+        logger.info(f"Top embedding match: {top_schemas[0]} (similarity: {similarities[0][0]:.4f})")
+        return top_schemas
+    
+    def needs_rebuild(self, current_schemas: List[SchemaMeta]) -> bool:
+        """Check if embeddings need to be rebuilt based on current schemas."""
+        if self.schema_embeddings is None:
+            return True
+        
+        current_ids = {schema.id for schema in current_schemas}
+        stored_ids = set(self.schema_ids) if self.schema_ids is not None else set()
+        
+        # Rebuild if schema sets don't match
+        return current_ids != stored_ids
 
 
 class ExtractorLLM(Protocol):
@@ -318,6 +450,8 @@ class AutoDetectAgent:
         logger.info("Initializing AutoDetectAgent")
         self.extractor = extractor or GeminiExtractor(os.getenv('GOOGLE_API_KEY'))
         self.prompts = load_prompts()
+        self.embedding_manager = EmbeddingManager(self.extractor)
+        self.embedding_manager.load_embeddings()
     
     def _format_schemas_for_selection(self, schemas: List[SchemaMeta]) -> str:
         """Format schemas for LLM selection prompt."""
@@ -334,10 +468,59 @@ class AutoDetectAgent:
             return valid_ids[0] if valid_ids else None
         return selected_id
     
-    async def select_schema(self, text: str, available_schemas: List[SchemaMeta]) -> Dict[str, Any]:
-        """Select the best schema for the given text."""
+    async def select_schema_embedding(self, text: str, available_schemas: List[SchemaMeta]) -> Dict[str, Any]:
+        """Select the best schema using embedding similarity."""
         start_time = time.time()
-        logger.info(f"Auto-detecting schema for text with {len(available_schemas)} available schemas")
+        logger.info(f"Auto-detecting schema using embeddings for text with {len(available_schemas)} available schemas")
+        
+        # Check if embeddings need rebuilding
+        if self.embedding_manager.needs_rebuild(available_schemas):
+            logger.info("Rebuilding schema embeddings...")
+            await self.embedding_manager.build_embeddings(available_schemas)
+        
+        try:
+            # Find best matching schema using embeddings
+            best_schema_ids = await self.embedding_manager.find_best_schema(text, available_schemas)
+            
+            if not best_schema_ids:
+                # Fallback to first available schema
+                logger.warning("No embedding matches found, using first available schema")
+                selected_schema_id = available_schemas[0].id if available_schemas else None
+            else:
+                selected_schema_id = best_schema_ids[0]
+            
+            # Find the selected schema object
+            selected_schema = next((s for s in available_schemas if s.id == selected_schema_id), None)
+            
+            # Calculate duration
+            duration = time.time() - start_time
+            
+            # Create usage stats (embeddings are much faster and cheaper)
+            usage_stats = {
+                "method": "embedding",
+                "duration": duration,
+                "total_cost": 0.001,  # Approximate cost for embedding generation
+                "total_tokens": 0  # Embedding doesn't use tokens like LLM
+            }
+            
+            logger.info(f"Selected schema via embedding: {selected_schema_id}")
+            
+            return {
+                "schema_id": selected_schema_id,
+                "schema": selected_schema,
+                "usage_stats": usage_stats
+            }
+            
+        except Exception as e:
+            logger.error(f"Embedding-based selection failed: {e}")
+            # Fallback to LLM-based selection
+            logger.info("Falling back to LLM-based selection")
+            return await self.select_schema_llm(text, available_schemas)
+    
+    async def select_schema_llm(self, text: str, available_schemas: List[SchemaMeta]) -> Dict[str, Any]:
+        """Select the best schema using LLM analysis."""
+        start_time = time.time()
+        logger.info(f"Auto-detecting schema using LLM for text with {len(available_schemas)} available schemas")
         
         # Format schemas and create prompt
         schemas_text = self._format_schemas_for_selection(available_schemas)
@@ -357,10 +540,11 @@ class AutoDetectAgent:
         # Calculate timing and usage statistics
         duration = time.time() - start_time
         usage_stats = calculate_usage_stats(response, model_config, duration)
+        usage_stats["method"] = "llm"
         
         # Process and validate selection
         selected_schema_id = response.text.strip()
-        logger.info(f"Selected schema: {selected_schema_id}")
+        logger.info(f"Selected schema via LLM: {selected_schema_id}")
         
         validated_id = self._validate_schema_selection(selected_schema_id, available_schemas)
         selected_schema = next((s for s in available_schemas if s.id == validated_id), None)
@@ -370,6 +554,15 @@ class AutoDetectAgent:
             "schema": selected_schema,
             "usage_stats": usage_stats
         }
+    
+    async def select_schema(self, text: str, available_schemas: List[SchemaMeta], method: str = "embedding") -> Dict[str, Any]:
+        """Select the best schema for the given text using specified method."""
+        if method == "embedding":
+            return await self.select_schema_embedding(text, available_schemas)
+        elif method == "llm":
+            return await self.select_schema_llm(text, available_schemas)
+        else:
+            raise ValueError(f"Unknown selection method: {method}. Use 'embedding' or 'llm'")
     
     async def _generate_single_metadata(self, prompt_key: str, schema_str: str) -> str:
         """Generate a single piece of metadata using LLM."""
@@ -421,7 +614,7 @@ class ExtractorService:
     
     def __init__(self, extractor: Optional[ExtractorLLM] = None):
         logger.info("Initializing ExtractorService")
-        self.extractor = extractor or GeminiExtractor()
+        self.extractor = extractor or GeminiExtractor(os.getenv('GOOGLE_API_KEY'))
         self.auto_detect_agent = AutoDetectAgent(
             self.extractor if isinstance(self.extractor, GeminiExtractor) else None
         )
@@ -443,13 +636,13 @@ class ExtractorService:
             }
         }
 
-    async def auto_extract(self, text: str, available_schemas: List[SchemaMeta], max_retries: int = 3) -> Dict[str, Any]:
+    async def auto_extract(self, text: str, available_schemas: List[SchemaMeta], max_retries: int = 3, method: str = "embedding") -> Dict[str, Any]:
         """Auto-detect schema and extract JSON from text."""
         start_time = time.time()
-        logger.info("Starting auto-extraction process")
+        logger.info(f"Starting auto-extraction process using {method} method")
         
-        # Select best schema
-        selection_result = await self.auto_detect_agent.select_schema(text, available_schemas)
+        # Select best schema using specified method
+        selection_result = await self.auto_detect_agent.select_schema(text, available_schemas, method)
         selected_schema_id = selection_result["schema_id"]
         selected_schema = selection_result["schema"]
         selection_stats = selection_result["usage_stats"]

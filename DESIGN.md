@@ -97,30 +97,10 @@ Text Input → Schema Summaries Analysis → Best Match Selection → JSON Extra
 - **Conversation Management**: Multi-turn extraction with error context
 - **Prompt Engineering**: Modular YAML configuration for prompt management
 
-### Performance & Model Optimization
-
-#### Model Configuration
-- **Gemini Pro**: Used for JSON extraction (higher accuracy)
-- **Gemini Flash**: Used for auto-detection and metadata generation (cost optimization)
-- **Performance Metrics**: Real-time tracking of duration, cost, and token usage
-
-#### Enhanced User Experience
+### Enhanced User Experience
 - **Confirmation Workflow**: Schema selection → review → confirmation → extraction
 - **Override Capability**: Manual schema selection option in auto-detect mode
 - **Performance Dashboard**: Frontend display of metrics for transparency
-
-### Frontend Enhancements
-
-#### Auto-Detect Workflow
-1. User enters text
-2. AI selects best schema automatically
-3. User reviews and confirms selection
-4. JSON extraction with performance metrics
-
-#### Statistics Display
-- Extraction time and model information
-- Token usage and cost tracking
-- Success rates and attempt counts
 
 ## Quality Assurance & Monitoring
 
@@ -141,3 +121,151 @@ Text Input → Schema Summaries Analysis → Best Match Selection → JSON Extra
 - **Auto-Detection**: 5-10 seconds using Gemini Flash
 - **JSON Extraction**: 20-30 seconds using Gemini Pro
 - **Success Rate**: 95%+ first-attempt success for well-structured text
+
+---
+
+# Design Evolution: Iteration 3 - Large Scale Architecture 
+
+**Implemented Embedding Search. Hybrid Search, Metadata Filtering, BM25 Search, Re-ranking still to be implemented when we have more schemas.**
+
+## Problem Statement: Scalability Bottlenecks
+
+### Current Limitations at Scale
+❌ **Linear Schema Comparison**: Auto-detection compares text against ALL schemas  
+❌ **LLM Processing Overhead**: Every schema requires LLM evaluation  
+❌ **Memory Constraints**: Loading 1000+ schemas impacts performance  
+❌ **Response Latency**: Auto-detection time scales linearly with schema count  
+
+## Solution: Hybrid Retrieval + Re-ranking Pipeline
+
+### Two-Stage Architecture
+```
+Stage 1: Fast Retrieval (Vector (if needed, +BM25+Metadata)) → Top-K Candidates (5-10)
+Stage 2: Intelligent Re-ranking (LLM/Re-ranker) → Best Schema Selection
+```
+
+### Stage 1: Hybrid Retrieval System
+
+#### Vector Similarity Search
+```python
+# Pre-computed schema embeddings for semantic matching
+schema_embeddings = embed_text([schema.summary for schema in all_schemas])
+query_embedding = embed_text(input_text)
+similarity_scores = cosine_similarity(query_embedding, schema_embeddings)
+top_semantic_matches = get_top_k(similarity_scores, k=20)
+```
+
+#### BM25 Keyword Search
+```python
+# Traditional keyword matching for exact term overlap
+bm25_index = build_bm25_index([schema.summary + schema.title for schema in schemas])
+bm25_scores = bm25_index.get_scores(input_text)
+top_keyword_matches = get_top_k(bm25_scores, k=20)
+```
+
+#### Metadata Filtering
+```python
+# Fast pre-filtering based on domain, category, tags
+def filter_by_metadata(text: str, schemas: List[Schema]) -> List[Schema]:
+    detected_domain = detect_domain(text)  # e.g., "finance", "healthcare" 
+    detected_type = detect_document_type(text)  # e.g., "resume", "invoice"
+    
+    return [s for s in schemas if 
+           s.domain == detected_domain or 
+           s.category == detected_type or
+           any(tag in text.lower() for tag in s.tags)]
+```
+
+#### Hybrid Ranking Strategy
+```python
+def hybrid_rank(embedding_results, bm25_results, metadata_results, weights=(0.5, 0.3, 0.2)):
+    combined_scores = {}
+    for schema_id in all_candidate_schemas:
+        score = (weights[0] * embedding_scores.get(schema_id, 0) +
+                weights[1] * bm25_scores.get(schema_id, 0) +  
+                weights[2] * metadata_scores.get(schema_id, 0))
+        combined_scores[schema_id] = score
+    
+    return sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)[:k]
+```
+
+### Stage 2: Intelligent Re-ranking
+
+#### LLM-Based Re-ranking (Current)
+```python
+async def llm_rerank(text: str, candidates: List[SchemaMeta]) -> str:
+    prompt = f"""
+    Given this text: {text[:2000]}
+    
+    Choose the best schema from these {len(candidates)} candidates:
+    {format_candidate_summaries(candidates)}
+    
+    Return only the schema ID of the best match.
+    """
+    return await llm_call(prompt, model="gemini-flash")
+```
+
+#### Dedicated Re-ranker Model (Future Enhancement)
+```python
+async def reranker_model(text: str, candidates: List[SchemaMeta]) -> str:
+    # Cross-encoder or similar re-ranking model
+    pairs = [(text, candidate.summary) for candidate in candidates]
+    scores = await reranker.predict(pairs)
+    best_idx = np.argmax(scores)
+    return candidates[best_idx].id
+```
+
+## Performance Benefits
+
+## Implementation Strategy
+
+### Database Schema for Scale
+```sql
+-- Vector storage for embeddings
+CREATE TABLE schema_embeddings (
+    schema_id VARCHAR PRIMARY KEY,
+    embedding VECTOR(1536),  -- OpenAI ada-002 dimensions
+    created_at TIMESTAMP
+);
+
+-- BM25 index table
+CREATE TABLE schema_keywords (
+    schema_id VARCHAR,
+    term VARCHAR,
+    tf_idf_score FLOAT,
+    INDEX(term, tf_idf_score)
+);
+
+-- Metadata for fast filtering
+CREATE TABLE schema_metadata (
+    schema_id VARCHAR PRIMARY KEY,
+    domain VARCHAR,
+    category VARCHAR,
+    tags JSON,
+    INDEX(domain), INDEX(category)
+);
+```
+
+## Todo Enhancements Pipeline
+
+### Phase 1: Re-ranker Integration
+```python
+class RerankerService:
+    def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-12-v2"):
+        self.model = CrossEncoder(model_name)
+    
+    async def rank_candidates(self, query: str, candidates: List[str]) -> List[Tuple[str, float]]:
+        pairs = [[query, candidate] for candidate in candidates]
+        scores = self.model.predict(pairs)
+        return sorted(zip(candidates, scores), key=lambda x: x[1], reverse=True)
+```
+
+### Phase 2: Advanced Hybrid Search
+- **Dense + Sparse**: Combine BERT embeddings with learned sparse representations
+- **Multi-Modal**: Include schema structure patterns in embedding computation
+- **Adaptive Weights**: Learn optimal combination weights from user feedback
+
+### Phase 3: Production Infrastructure
+- **Vector Database**: Migration to Pinecone/Weaviate for production-scale vector search
+- **Load Balancing**: Distribute retrieval and re-ranking across multiple instances  
+- **Monitoring**: Real-time metrics for retrieval precision@K and end-to-end latency

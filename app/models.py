@@ -10,6 +10,7 @@ class ExtractRequest(BaseModel):
 class ExtractAutoRequest(BaseModel):
     text: str
     top_k: Optional[int] = 20
+    method: Optional[str] = "embedding"  # "embedding" or "llm"
 
 
 class ExtractResponse(BaseModel):

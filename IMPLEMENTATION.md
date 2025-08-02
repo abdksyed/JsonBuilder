@@ -103,51 +103,25 @@ async def generate_schema_metadata(schema_data: Dict) -> Dict
 - **`POST /select-schema`**: Schema selection without extraction for preview workflow
 - **`POST /extract/auto`**: Auto-detection with extraction in single request
 
-#### Enhanced API Responses
-- All extraction endpoints now return performance statistics
-- Frontend receives timing, cost, and token usage data
-- Model information included in response metadata
+---
 
-### Frontend Enhancements
+# Implementation v0.3.0 (Iteration 3) - Large Scale
 
-#### Auto-Detect Workflow
-1. User enters text and clicks "Auto-Select Schema"
-2. AI selects best schema and shows preview with performance stats
-3. User reviews selection and can override if needed
-4. User confirms and extracts JSON with full metrics display
+## Overview
+Scalable JSON Extractor with hybrid retrieval, intelligent ranking, and high-performance schema management for large-scale deployments.
 
-#### Performance Dashboard
-- Real-time display of extraction time and model used
-- Token usage and cost information for transparency
-- Success indicators and attempt counts
+## New Features for Scale
 
-## Performance Improvements
+### Schema Retrieval System
+- **Vector Embeddings**: Schema summaries converted to embeddings for semantic search
+- **TODOs/Future Features**:
+    - Based on the set of JSON schemas, their metadata, types of JSON schemas, we can further improve the auto-detection process
+    - **Metadata Filtering**: Pre-filter schemas by category, domain, or tags before retrieval
+    - **BM25 Integration**: Keyword-based search combined with semantic similarity
+    - **Hybrid Ranking**: Combine embedding scores + metadata + BM25 for optimal results
 
-### Model Optimization
-- **Gemini Pro**: Used for JSON extraction (higher accuracy)
-- **Gemini Flash**: Used for schema selection and metadata generation (cost efficiency)
-- **Performance Tracking**: All requests return timing and usage statistics
-
-### Enhanced User Experience
-- **Confirmation Workflow**: Two-step process prevents unintended extractions
-- **Override Options**: Manual schema selection available in auto-detect mode
-- **Real-time Feedback**: Performance metrics visible during and after operations
-
-## Quality Assurance
-
-### Error Handling
-- **Graceful degradation**: Falls back to first available schema if auto-detection fails
-- **Validation integration**: All generated metadata validated before storage
-- **User feedback**: Clear error messages and recovery suggestions
-
-### Testing Coverage
-- Auto-detection accuracy with various text types
-- Metadata generation quality and appropriateness
-- Edge cases (empty schema lists, invalid inputs)
-- Performance under load with multiple concurrent requests
-
-## Migration Notes
-- Backward compatible with v0.1.0 APIs
-- Existing schemas continue to work unchanged
-- New optional features don't break existing workflows
-- Enhanced logging provides better debugging capabilities
+### Intelligent Schema Selection
+- **Top-K Retrieval**: Fast initial filtering to top 5-10 candidates from large schema collections
+- **Re-ranking (TODO)**: LLM or dedicated re-ranker model selects best from top-K candidates
+- **Performance Optimization**: Two-stage pipeline reduces LLM processing overhead
+- **Scalable Architecture**: Handles large number of schemas with sub-second retrieval

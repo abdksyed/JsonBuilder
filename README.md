@@ -45,7 +45,7 @@ A powerful web application that extracts structured JSON data from unstructured 
 2. **Set up virtual environment**:
    ```bash
    # Using uv (recommended - faster)
-   uv venv .venv
+   uv venv --python=3.13 
 
    # Or using pip
    python -m venv .venv
@@ -57,10 +57,10 @@ A powerful web application that extracts structured JSON data from unstructured 
 3. **Install dependencies**:
    ```bash
    # Using uv (recommended - faster)
-   uv pip install fastapi uvicorn pydantic jsonschema google-genai
+   uv pip install -r requirements.txt
    
    # Or using pip
-   pip install fastapi uvicorn pydantic jsonschema google-genai
+   pip install -r requirements.txt
    ```
 
 4. **Set up environment variables**:
@@ -74,7 +74,11 @@ A powerful web application that extracts structured JSON data from unstructured 
 
 5. **Run the application**:
    ```bash
-   python run.py
+   uv run run.py
+
+   (or)
+
+   export GOOGLE_API_KEY="your-gemini-api-key-here" && uv run run.py
    ```
 
 6. **Open your browser** and navigate to `http://localhost:8000`

@@ -45,8 +45,8 @@ async def select_schema(request: ExtractAutoRequest) -> Dict[str, Any]:
         if not schemas:
             raise HTTPException(status_code=400, detail="No schemas available for auto-detection")
         
-        # Auto-select schema only
-        result = await extractor_service.auto_detect_agent.select_schema(request.text, schemas)
+        # Auto-select schema only using specified method
+        result = await extractor_service.auto_detect_agent.select_schema(request.text, schemas, request.method)
         
         return {
             "schema_id": result["schema_id"],
@@ -69,8 +69,8 @@ async def extract_json_auto(request: ExtractAutoRequest) -> ExtractResponse:
         if not schemas:
             raise HTTPException(status_code=400, detail="No schemas available for auto-detection")
         
-        # Auto-detect and extract
-        result = await extractor_service.auto_extract(request.text, schemas)
+        # Auto-detect and extract using specified method
+        result = await extractor_service.auto_extract(request.text, schemas, method=request.method)
         
         return ExtractResponse(
             schema_id=result["schema_id"],
