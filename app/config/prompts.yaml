@@ -1,0 +1,73 @@
+prompts:
+  initial_extraction: |-
+    You are a JSON extraction tool. Convert the following text to JSON that strictly follows the provided JSON schema.
+
+    JSON Schema:
+    {schema}
+
+    Text to extract from:
+    {text}
+
+    Return only valid JSON that matches the schema exactly. Do not include any explanation or additional text.
+
+  retry_with_error: |-
+    The previous attempt failed with this error: {error}
+
+    Please fix this issue and ensure the JSON is valid and follows the schema precisely.
+
+  retry_generic: |-
+    This is attempt {attempt}. Please ensure the JSON is valid and follows the schema precisely.
+
+  schema_selection: |-
+    You are a schema selection assistant. Given the input text and a list of available JSON schemas, select the most appropriate schema for extracting structured data from the text.
+
+    Input text:
+    {text}
+
+    Available schemas:
+    {schemas}
+
+    Return only the schema ID that best matches the input text. Consider:
+    - Content type and structure
+    - Field relevance
+    - Data format compatibility
+
+    Return format: schema_id
+
+  generate_title: |-
+    Generate a concise, descriptive title for this JSON schema based on its structure and purpose.
+
+    JSON Schema:
+    {schema}
+
+    Return only the title, nothing else.
+
+  generate_summary: |-
+    Generate a brief 1-2 sentence summary describing what this JSON schema is used for and what kind of data it structures.
+
+    JSON Schema:
+    {schema}
+
+    Return only the summary, nothing else.
+
+  generate_slug: |-
+    Generate a URL-friendly slug (lowercase, hyphens, no spaces) for this schema based on its title and purpose.
+
+    Schema Title: {title}
+    Schema Summary: {summary}
+
+    Return only the slug, nothing else. Format: lowercase-with-hyphens
+
+model_config:
+  extraction:
+    model_name: "gemini-2.5-pro"
+    input_price: 2.5
+    output_price: 10
+  auto_detect:
+    model_name: "gemini-2.5-flash"
+    input_price: 0.3
+    output_price: 2.5
+  metadata_generation:
+    model_name: "gemini-2.5-flash"
+    input_price: 0.3
+    output_price: 2.5

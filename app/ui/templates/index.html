@@ -20,7 +20,7 @@
                             Manual Schema
                         </button>
                         <button id="auto-tab" class="tab-button py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                            Auto-Detect (Coming Soon)
+                            Auto-Detect
                         </button>
                         <button id="add-schema-tab" class="tab-button py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
                             Add Schema
@@ -75,6 +75,15 @@
                             </div>
                         </div>
                         
+                        <!-- Performance Stats for Manual -->
+                        <div id="manual-performance-stats" class="hidden bg-gray-50 border border-gray-200 rounded-md p-3">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Performance Metrics</h4>
+                            <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                <div>Time: <span id="manual-stat-time">-</span>s</div>
+                                <div>Model: <span id="manual-stat-model">-</span></div>
+                            </div>
+                        </div>
+                        
                         <div class="relative">
                             <pre id="json-output" 
                                  class="w-full h-40 p-3 bg-gray-50 border border-gray-300 rounded-md font-mono text-sm overflow-auto"></pre>
@@ -92,11 +101,110 @@
                 </div>
             </div>
 
-            <!-- Auto-Detect Tab (Placeholder) -->
+            <!-- Auto-Detect Tab -->
             <div id="auto-content" class="tab-content hidden">
-                <div class="text-center py-12">
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">Auto-Detection Coming Soon</h3>
-                    <p class="text-gray-600">This feature will automatically select the best schema based on your input text.</p>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Input Section -->
+                    <div class="space-y-4">
+                        <div>
+                            <label for="auto-text-input" class="block text-sm font-medium text-gray-700 mb-2">
+                                Input Text
+                            </label>
+                            <textarea id="auto-text-input" 
+                                    class="w-full h-40 p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                                    placeholder="Enter text and let AI automatically select the best schema..."></textarea>
+                        </div>
+                        
+                        <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <h3 class="text-sm font-medium text-blue-800">
+                                        Enhanced Auto-Detection Workflow
+                                    </h3>
+                                    <div class="mt-2 text-sm text-blue-700">
+                                        <p>1. AI selects best schema for your text<br>
+                                        2. Review and confirm the selected schema<br>
+                                        3. Extract JSON with the confirmed schema</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button id="auto-select-btn" 
+                                class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 font-medium">
+                            🎯 Auto-Select Schema
+                        </button>
+                        
+                        <!-- Schema Confirmation Section -->
+                        <div id="schema-confirmation" class="hidden bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                            <h4 class="text-sm font-medium text-yellow-800 mb-2">Selected Schema:</h4>
+                            <div class="space-y-2">
+                                <p class="text-sm text-yellow-700"><strong id="selected-title">-</strong></p>
+                                <p class="text-xs text-yellow-600" id="selected-summary">-</p>
+                                <select id="schema-override" class="w-full text-sm border border-yellow-300 rounded px-2 py-1">
+                                    <option value="">Use AI selection or choose different schema...</option>
+                                </select>
+                            </div>
+                            <div class="mt-3 flex space-x-2">
+                                <button id="confirm-extract-btn" 
+                                        class="flex-1 bg-green-600 text-white py-2 px-3 rounded text-sm hover:bg-green-700">
+                                    ✅ Extract with This Schema
+                                </button>
+                                <button id="cancel-selection-btn" 
+                                        class="px-3 py-2 border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Output Section -->
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-sm font-medium text-gray-700">
+                                Extracted JSON
+                            </label>
+                            <div id="auto-validation-badge" class="hidden">
+                                <span id="auto-valid-badge" class="hidden inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    ✅ Valid
+                                </span>
+                                <span id="auto-invalid-badge" class="hidden inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    ❌ Invalid
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Performance Stats -->
+                        <div id="performance-stats" class="hidden bg-gray-50 border border-gray-200 rounded-md p-3">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Performance Metrics</h4>
+                            <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                <div>Time: <span id="stat-time">-</span>s</div>
+                                <div>Cost: $<span id="stat-cost">-</span></div>
+                                <div>Tokens: <span id="stat-tokens">-</span></div>
+                                <div>Model: <span id="stat-model">-</span></div>
+                            </div>
+                        </div>
+                        
+                        <div class="relative">
+                            <pre id="auto-json-output" 
+                                 class="w-full h-40 p-3 bg-gray-50 border border-gray-300 rounded-md font-mono text-sm overflow-auto"></pre>
+                            <button id="auto-copy-btn" 
+                                    class="hidden absolute top-2 right-2 bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded text-xs">
+                                Copy
+                            </button>
+                        </div>
+                        
+                        <div id="auto-metadata" class="hidden text-sm text-gray-600">
+                            <p>Attempts: <span id="auto-attempts-count">-</span></p>
+                            <p>Schema: <span id="final-schema-name">-</span></p>
+                            <p id="auto-error-message" class="hidden text-red-600"></p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -107,24 +215,40 @@
                         <h3 class="text-lg font-medium text-gray-900 mb-6">Create New Schema</h3>
                         
                         <form id="schema-form" class="space-y-4">
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h3 class="text-sm font-medium text-yellow-800">
+                                            AI-Powered Schema Creation
+                                        </h3>
+                                        <div class="mt-2 text-sm text-yellow-700">
+                                            <p>Leave title and summary empty to auto-generate them using AI! Just provide the JSON schema.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div>
                                 <label for="schema-title" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Schema Title
+                                    Schema Title <span class="text-gray-400">(optional - AI will generate if empty)</span>
                                 </label>
                                 <input type="text" id="schema-title" 
                                        class="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                       placeholder="e.g., Person Information"
-                                       required>
+                                       placeholder="e.g., Person Information">
                             </div>
                             
                             <div>
                                 <label for="schema-summary" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Summary
+                                    Summary <span class="text-gray-400">(optional - AI will generate if empty)</span>
                                 </label>
                                 <textarea id="schema-summary" 
                                           class="w-full h-20 p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 resize-vertical"
-                                          placeholder="Brief description of what this schema extracts"
-                                          required></textarea>
+                                          placeholder="Brief description of what this schema extracts"></textarea>
                             </div>
                             
                             
@@ -309,6 +433,11 @@
                 // Show copy button
                 document.getElementById('copy-btn').classList.remove('hidden');
                 
+                // Show performance stats for manual extraction if available
+                if (result.stats) {
+                    showManualPerformanceStats(result.stats);
+                }
+                
             } catch (error) {
                 console.error('Extraction failed:', error);
                 document.getElementById('json-output').textContent = 'Extraction failed: ' + error.response?.data?.detail || error.message;
@@ -348,6 +477,188 @@
             }
         }
 
+        // Global variables for auto-detect workflow
+        let selectedSchemaData = null;
+        let allSchemas = [];
+
+        // Auto-select schema
+        async function autoSelectSchema() {
+            const text = document.getElementById('auto-text-input').value.trim();
+            
+            if (!text) {
+                alert('Please enter text to analyze');
+                return;
+            }
+            
+            const button = document.getElementById('auto-select-btn');
+            button.disabled = true;
+            button.textContent = '🎯 Selecting Schema...';
+            
+            try {
+                const response = await axios.post('/select-schema', {
+                    text: text
+                });
+                
+                const result = response.data;
+                selectedSchemaData = result;
+                
+                // Show schema confirmation
+                document.getElementById('selected-title').textContent = result.schema_title || result.schema_id;
+                document.getElementById('selected-summary').textContent = result.schema_summary || 'No summary available';
+                
+                // Populate schema override dropdown
+                await populateSchemaOverride();
+                
+                // Show confirmation section
+                document.getElementById('schema-confirmation').classList.remove('hidden');
+                
+                // Show selection stats
+                if (result.stats) {
+                    showPerformanceStats(result.stats, 'gemini-2.5-flash');
+                }
+                
+            } catch (error) {
+                console.error('Schema selection failed:', error);
+                alert('Schema selection failed: ' + (error.response?.data?.detail || error.message));
+            } finally {
+                button.disabled = false;
+                button.textContent = '🎯 Auto-Select Schema';
+            }
+        }
+
+        // Populate schema override dropdown
+        async function populateSchemaOverride() {
+            try {
+                if (allSchemas.length === 0) {
+                    const response = await axios.get('/schemas');
+                    allSchemas = response.data.schemas;
+                }
+                
+                const select = document.getElementById('schema-override');
+                select.innerHTML = '<option value="">Use AI selection or choose different schema...</option>';
+                
+                allSchemas.forEach(schema => {
+                    const option = document.createElement('option');
+                    option.value = schema.id;
+                    option.textContent = `${schema.title} - ${schema.summary}`;
+                    if (schema.id === selectedSchemaData?.schema_id) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load schemas for override:', error);
+            }
+        }
+
+        // Confirm and extract with selected schema
+        async function confirmAndExtract() {
+            const text = document.getElementById('auto-text-input').value.trim();
+            const overrideSelect = document.getElementById('schema-override');
+            const schemaId = overrideSelect.value || selectedSchemaData?.schema_id;
+            
+            if (!text || !schemaId) {
+                alert('Please ensure text and schema are selected');
+                return;
+            }
+            
+            const button = document.getElementById('confirm-extract-btn');
+            button.disabled = true;
+            button.textContent = '⏳ Extracting...';
+            
+            try {
+                const response = await axios.post('/extract', {
+                    text: text,
+                    schema_id: schemaId
+                });
+                
+                const result = response.data;
+                
+                // Display JSON
+                document.getElementById('auto-json-output').textContent = JSON.stringify(result.data, null, 2);
+                
+                // Show validation badge
+                const validBadge = document.getElementById('auto-valid-badge');
+                const invalidBadge = document.getElementById('auto-invalid-badge');
+                const badge = document.getElementById('auto-validation-badge');
+                
+                badge.classList.remove('hidden');
+                if (result.valid) {
+                    validBadge.classList.remove('hidden');
+                    invalidBadge.classList.add('hidden');
+                } else {
+                    validBadge.classList.add('hidden');
+                    invalidBadge.classList.remove('hidden');
+                }
+                
+                // Show metadata
+                document.getElementById('auto-attempts-count').textContent = result.attempts;
+                document.getElementById('final-schema-name').textContent = schemaId;
+                const metadata = document.getElementById('auto-metadata');
+                metadata.classList.remove('hidden');
+                
+                const errorMsg = document.getElementById('auto-error-message');
+                if (result.error) {
+                    errorMsg.textContent = `Error: ${result.error}`;
+                    errorMsg.classList.remove('hidden');
+                } else {
+                    errorMsg.classList.add('hidden');
+                }
+                
+                // Show copy button
+                document.getElementById('auto-copy-btn').classList.remove('hidden');
+                
+                // Show performance stats if available
+                if (result.stats) {
+                    showPerformanceStats(result.stats, result.stats.model || 'gemini-2.5-pro');
+                }
+                
+                // Hide confirmation section
+                document.getElementById('schema-confirmation').classList.add('hidden');
+                
+            } catch (error) {
+                console.error('Extraction failed:', error);
+                document.getElementById('auto-json-output').textContent = 'Extraction failed: ' + (error.response?.data?.detail || error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = '✅ Extract with This Schema';
+            }
+        }
+
+        // Cancel schema selection
+        function cancelSelection() {
+            document.getElementById('schema-confirmation').classList.add('hidden');
+            selectedSchemaData = null;
+            document.getElementById('performance-stats').classList.add('hidden');
+        }
+
+        // Show performance statistics
+        function showPerformanceStats(stats, model) {
+            document.getElementById('stat-time').textContent = (stats.duration || 0).toFixed(2);
+            document.getElementById('stat-cost').textContent = (stats.total_cost || 0).toFixed(6);
+            document.getElementById('stat-tokens').textContent = stats.total_tokens || 0;
+            document.getElementById('stat-model').textContent = model || 'Unknown';
+            document.getElementById('performance-stats').classList.remove('hidden');
+        }
+        
+        // Show manual performance statistics
+        function showManualPerformanceStats(stats) {
+            document.getElementById('manual-stat-time').textContent = (stats.duration || 0).toFixed(2);
+            document.getElementById('manual-stat-model').textContent = stats.model || 'Unknown';
+            document.getElementById('manual-performance-stats').classList.remove('hidden');
+        }
+
+        // Auto copy to clipboard
+        function autoCopyToClipboard() {
+            const output = document.getElementById('auto-json-output').textContent;
+            navigator.clipboard.writeText(output).then(() => {
+                const button = document.getElementById('auto-copy-btn');
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                setTimeout(() => button.textContent = originalText, 2000);
+            });
+        }
+
         // Create schema
         async function createSchema(event) {
             event.preventDefault();
@@ -356,8 +667,8 @@
             const summary = document.getElementById('schema-summary').value.trim();
             const schemaText = document.getElementById('schema-json').value.trim();
             
-            if (!title || !summary || !schemaText) {
-                showSchemaFeedback('error', 'Please fill in all fields');
+            if (!schemaText) {
+                showSchemaFeedback('error', 'Please provide the JSON schema');
                 return;
             }
             
@@ -374,11 +685,11 @@
             button.textContent = 'Creating...';
             
             try {
-                const response = await axios.post('/schemas', {
-                    title: title,
-                    summary: summary,
-                    schema_data: schemaData
-                });
+                const payload = { schema_data: schemaData };
+                if (title) payload.title = title;
+                if (summary) payload.summary = summary;
+                
+                const response = await axios.post('/schemas', payload);
                 
                 const result = response.data;
                 document.getElementById('created-schema-id').textContent = result.id;
@@ -442,6 +753,10 @@
         // Event listeners
         document.getElementById('extract-btn').addEventListener('click', extractJSON);
         document.getElementById('copy-btn').addEventListener('click', copyToClipboard);
+        document.getElementById('auto-select-btn').addEventListener('click', autoSelectSchema);
+        document.getElementById('confirm-extract-btn').addEventListener('click', confirmAndExtract);
+        document.getElementById('cancel-selection-btn').addEventListener('click', cancelSelection);
+        document.getElementById('auto-copy-btn').addEventListener('click', autoCopyToClipboard);
         document.getElementById('schema-form').addEventListener('submit', createSchema);
         document.getElementById('validate-schema-btn').addEventListener('click', validateSchema);
         

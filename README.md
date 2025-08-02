@@ -4,13 +4,27 @@ A powerful web application that extracts structured JSON data from unstructured 
 
 ## Features
 
+### 🎯 Core Extraction
 - **Schema-Driven Extraction**: Use JSON Schema to define exactly what data you want to extract
-- **LLM-Powered**: Leverages Google Gemini for intelligent text understanding
+- **LLM-Powered**: Leverages Google Gemini 2.5 Flash for intelligent text understanding
 - **Auto-Retry Logic**: Automatically retries with validation feedback for improved accuracy
-- **Web Interface**: Clean, responsive UI for easy interaction
+- **Multi-Turn Conversations**: LLM learns from validation errors to improve subsequent attempts
+
+### 🤖 AI-Powered Intelligence (v0.2.0)
+- **Auto-Schema Detection**: AI automatically selects the best schema for your text
+- **Smart Schema Creation**: Auto-generate titles, summaries, and URL-friendly slugs
+- **Contextual Learning**: Each retry attempt includes previous error context for better results
+
+### 🎨 User Experience
+- **Clean Web Interface**: Responsive 3-tab UI for manual extraction, auto-detection, and schema creation
+- **Real-time Validation**: Instant feedback on extraction results with visual indicators
 - **Schema Management**: Create, view, and manage your extraction schemas
-- **Real-time Validation**: Instant feedback on extraction results
 - **Template Library**: Pre-built schemas for common use cases
+
+### 📊 Monitoring & Logging
+- **Comprehensive Logging**: All LLM interactions, token usage, and costs logged to `services.log`
+- **Performance Metrics**: Track success rates, attempt counts, and response times
+- **Cost Tracking**: Real-time token usage and pricing information
 
 ## Quick Start
 
@@ -79,12 +93,12 @@ The application provides a clean, three-tab interface for easy JSON extraction:
 
 The main extraction interface allows you to process text using predefined schemas:
 
+![Manual Schema Tab](screenshots/manual-schema-tab.png)
+
 1. **Enter your text** in the input area
 2. **Select a schema** from the dropdown (includes Person Info, Product Info, etc.)
 3. **Click "Extract JSON"** to process
 4. **View results** with validation status and copy functionality
-
-![Form with Text Input](screenshots/form-filled.png)
 
 **Example Workflow**:
 - **Input text**: "John Doe is 30 years old and works at Acme Corp. His email is john@acme.com"
@@ -98,17 +112,42 @@ The system automatically:
 - Shows the number of attempts needed (auto-retry on failures)
 - Provides a "Copy" button for easy use of the results
 
-#### 2. Add Schema Tab - Create Custom Schemas
+#### 2. Auto-Detect Tab - AI-Powered Schema Selection (v0.2.0)
 
-Create and manage your own extraction schemas with built-in templates:
+Let AI automatically choose the best schema for your text:
 
-![Add Schema Interface](screenshots/add-schema-tab.png)
+![Auto-Detect Tab](screenshots/auto-detect-tab-filled.png)
+
+1. **Enter your text** - no need to select a schema manually
+2. **Click "🤖 Auto-Extract JSON"** to let AI analyze your text
+3. **AI selects** the most appropriate schema from your available options
+4. **View results** with selected schema information
+
+![Auto-Detect Result](screenshots/auto-detect-result.png)
+
+**Benefits**:
+- **Time-saving**: No manual schema selection required
+- **Smart matching**: AI analyzes content type, structure, and field relevance  
+- **Visual feedback**: See which schema was automatically selected
+- **Same reliability**: Uses the same validation and retry logic as manual mode
+
+#### 3. Add Schema Tab - Create Custom Schemas with AI Assistance
+
+Create and manage your own extraction schemas with AI-powered metadata generation:
+
+![Add Schema Interface](screenshots/add-schema-auto-generate.png)
 
 **Schema Creation Process**:
-1. **Enter schema details**: Title and summary
-2. **Define JSON Schema**: Use JSON Schema Draft 7 format
-3. **Validate** your schema syntax before saving
-4. **Create** to add to your schema library
+1. **Define JSON Schema**: Use JSON Schema Draft 7 format (required)
+2. **Optional metadata**: Leave title and summary empty for AI auto-generation
+3. **Validate** your schema syntax before saving  
+4. **Create** to add to your schema library with auto-generated slug ID
+
+**AI-Powered Features (v0.2.0)**:
+- **Auto-Generated Titles**: AI creates descriptive titles from schema analysis
+- **Smart Summaries**: AI generates concise descriptions of schema purpose
+- **URL-Friendly Slugs**: Automatic creation of clean, readable schema IDs
+- **Manual Override**: You can still provide custom titles and summaries if preferred
 
 **Example Schema**:
 ```json
@@ -139,12 +178,22 @@ curl -X POST "http://localhost:8000/extract" \
   }'
 ```
 
+#### Auto-Detect Schema and Extract (v0.2.0)
+```bash
+curl -X POST "http://localhost:8000/extract/auto" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "John Smith is a 30-year-old software engineer at TechCorp. Email: john@techcorp.com",
+    "top_k": 10
+  }'
+```
+
 #### List Available Schemas
 ```bash
 curl "http://localhost:8000/schemas"
 ```
 
-#### Create New Schema
+#### Create New Schema (Manual)
 ```bash
 curl -X POST "http://localhost:8000/schemas" \
   -H "Content-Type: application/json" \
@@ -160,6 +209,24 @@ curl -X POST "http://localhost:8000/schemas" \
     }
   }'
 ```
+
+#### Create Schema with AI Auto-Generation (v0.2.0)
+```bash
+curl -X POST "http://localhost:8000/schemas" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schema_data": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"},
+        "department": {"type": "string"},
+        "salary": {"type": "number"}
+      },
+      "required": ["name", "department"]
+    }
+  }'
+```
+*AI will auto-generate title, summary, and slug based on schema analysis*
 
 ## Schema Examples
 
@@ -201,7 +268,7 @@ Extract product details from descriptions:
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/extract` | Extract JSON using specific schema |
-| `POST` | `/extract/auto` | Auto-detect best schema (coming soon) |
+| `POST` | `/extract/auto` | Auto-detect best schema and extract JSON |
 | `GET` | `/schemas` | List all schemas with pagination |
 | `GET` | `/schemas/{id}` | Get specific schema |
 | `POST` | `/schemas` | Create new schema |
@@ -213,6 +280,7 @@ Extraction responses include:
 - `data`: The extracted JSON object
 - `valid`: Boolean indicating schema validation success
 - `attempts`: Number of retry attempts used
+- `schema_id`: ID of the schema used (especially useful for auto-detection)
 - `error`: Error message if extraction failed
 
 ## Configuration

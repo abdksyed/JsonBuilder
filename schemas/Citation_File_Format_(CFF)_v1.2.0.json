@@ -1,5 +1,5 @@
 {
-  "id": "2fda6206-5294-4a9f-8f60-d37ce943065b",
+  "id": "citation-file",
   "title": "Citation File Format (CFF) v1.2.0",
   "summary": "This JSON Schema specifies the structure of a CITATION.cff file, detailing how to represent citation metadata for software or datasets. It captures core elements such as authors or entities, title, release date, version, licensing, identifiers (DOI, URL, SWH), keywords, preferred and related references, and repository links—ensuring that research outputs can be cited consistently and machine-readably across tools and platforms.",
   "schema_data": {

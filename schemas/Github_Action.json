@@ -1,5 +1,5 @@
 {
-  "id": "9da4ebdd-65db-4287-98bc-4c88be9c731d",
+  "id": "github-action",
   "title": "Github Action",
   "summary": "The GitHub Action metadata schema defines the YAML structure ( action.yml ) that describes an action’s identity—its name, author, description, branding, inputs, outputs, and execution settings. It enforces mutually-exclusive “runs” configurations for JavaScript (node*), Docker, or composite actions, ensuring every action is valid, self-documenting, and executable on GitHub’s workflow runner.",
   "schema_data": {

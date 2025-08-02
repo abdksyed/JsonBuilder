@@ -21,15 +21,40 @@ async def extract_json(request: ExtractRequest) -> ExtractResponse:
             raise HTTPException(status_code=404, detail=f"Schema {request.schema_id} not found")
         
         # Extract JSON using the service
-        result = await extractor_service.extract(request.text, schema.schema_data)
+        result = await extractor_service.extract(request.text, schema)
         
         return ExtractResponse(
             schema_id=request.schema_id,
             data=result["data"],
             valid=result["valid"],
             attempts=result["attempts"],
-            error=result.get("error")
+            error=result.get("error"),
+            stats=result.get("stats")
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/select-schema")
+async def select_schema(request: ExtractAutoRequest) -> Dict[str, Any]:
+    """Auto-select best schema for given text (without extraction)."""
+    try:
+        # Get available schemas
+        schemas = await schema_repo.list_schemas(page=1, per_page=request.top_k or 20)
+        
+        if not schemas:
+            raise HTTPException(status_code=400, detail="No schemas available for auto-detection")
+        
+        # Auto-select schema only
+        result = await extractor_service.auto_detect_agent.select_schema(request.text, schemas)
+        
+        return {
+            "schema_id": result["schema_id"],
+            "schema_title": result["schema"].title if result["schema"] else None,
+            "schema_summary": result["schema"].summary if result["schema"] else None,
+            "schema_data": result["schema"].schema_data if result["schema"] else None,
+            "stats": result["usage_stats"]
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -38,9 +63,23 @@ async def extract_json(request: ExtractRequest) -> ExtractResponse:
 async def extract_json_auto(request: ExtractAutoRequest) -> ExtractResponse:
     """Auto-select best schema and extract JSON from text."""
     try:
-        # TODO: Implement schema selection logic
-        # For now, just return an error
-        raise HTTPException(status_code=501, detail="Auto-extraction not yet implemented")
+        # Get available schemas
+        schemas = await schema_repo.list_schemas(page=1, per_page=request.top_k or 20)
+        
+        if not schemas:
+            raise HTTPException(status_code=400, detail="No schemas available for auto-detection")
+        
+        # Auto-detect and extract
+        result = await extractor_service.auto_extract(request.text, schemas)
+        
+        return ExtractResponse(
+            schema_id=result["schema_id"],
+            data=result["data"],
+            valid=result["valid"],
+            attempts=result["attempts"],
+            error=result.get("error"),
+            stats=result.get("stats")
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -78,7 +117,6 @@ async def list_schemas(page: int = 1, per_page: int = 50) -> SchemaListResponse:
 async def create_schema(request: CreateSchemaRequest) -> CreateSchemaResponse:
     """Create a new schema."""
     try:
-        import uuid
         import jsonschema
         
         # Validate that the schema_data is a valid JSON schema
@@ -87,14 +125,30 @@ async def create_schema(request: CreateSchemaRequest) -> CreateSchemaResponse:
         except jsonschema.SchemaError as e:
             raise HTTPException(status_code=400, detail=f"Invalid JSON schema: {str(e)}")
         
-        # Generate unique ID
-        schema_id = str(uuid.uuid4())
+        # Generate metadata if not provided
+        title = request.title
+        summary = request.summary
+        schema_id = None
+        
+        if not title or not summary:
+            metadata = await extractor_service.generate_schema_metadata(request.schema_data)
+            if not title:
+                title = metadata["title"]
+            if not summary:
+                summary = metadata["summary"]
+            schema_id = metadata["slug"]
+        
+        # If we still don't have an ID, generate one from title
+        if not schema_id:
+            import re
+            schema_id = re.sub(r'[^a-z0-9-]', '-', title.lower())
+            schema_id = re.sub(r'-+', '-', schema_id).strip('-')
         
         # Create schema metadata
         schema_meta = SchemaMeta(
             id=schema_id,
-            title=request.title,
-            summary=request.summary,
+            title=title,
+            summary=summary,
             schema_data=request.schema_data
         )
         

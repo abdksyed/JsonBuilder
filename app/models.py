@@ -18,6 +18,7 @@ class ExtractResponse(BaseModel):
     valid: bool
     attempts: int
     error: Optional[str] = None
+    stats: Optional[Dict[str, Any]] = None
 
 
 class SchemaMeta(BaseModel):
@@ -35,8 +36,8 @@ class SchemaListResponse(BaseModel):
 
 
 class CreateSchemaRequest(BaseModel):
-    title: str
-    summary: str
+    title: Optional[str] = None
+    summary: Optional[str] = None
     schema_data: Dict[str, Any]
 
 
