@@ -1,4 +1,138 @@
-# JSON Extraction Backend Design
+# Current Backend Architecture
+
+## System Overview
+
+The JsonBuilder backend is a **FastAPI-based microservice** designed for schema-aware JSON extraction from unstructured text. It implements a layered architecture with clear separation between API, business logic, and data layers.
+
+### Core Architecture Components
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     API Layer (FastAPI)                    │
+├─────────────────────────────────────────────────────────────┤
+│  • REST Endpoints (/extract, /extract/auto, /schemas)      │
+│  • Request/Response Models (Pydantic)                      │
+│  • HTTP Error Handling & Status Codes                     │
+└─────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Service Layer                            │
+├─────────────────────────────────────────────────────────────┤
+│  • ExtractorService (Main Orchestrator)                   │
+│  • AutoDetectAgent (Schema Selection)                     │
+│  • GeminiExtractor (LLM Integration)                      │
+│  • EmbeddingManager (Vector Search)                       │
+└─────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Repository Layer                           │
+├─────────────────────────────────────────────────────────────┤
+│  • SchemaRepository (File-based Storage)                  │
+│  • Schema CRUD Operations                                 │
+│  • Pagination Support                                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Detailed Component Analysis
+
+### 1. API Layer (`app/main.py`, `app/api/routes.py`)
+
+**Framework**: FastAPI 
+**Responsibility**: HTTP request handling and API contract enforcement
+
+#### Key Endpoints:
+- `POST /extract` - Schema-specific JSON extraction
+- `POST /extract/auto` - Auto-detect schema and extract  
+- `POST /select-schema` - Schema selection without extraction
+- `GET /schemas` - List available schemas with pagination
+- `POST /schemas` - Create new schema with auto-metadata generation
+- `DELETE /schemas/{id}` - Delete schema by ID
+
+#### Request/Response Models (`app/models.py`):
+```python
+ExtractRequest: text + schema_id
+ExtractAutoRequest: text + method + top_k  
+ExtractResponse: schema_id + data + validation_status + attempts + stats
+SchemaMeta: id + title + summary + schema_data
+```
+
+### 2. Service Layer (`app/services/extractor.py`)
+
+#### ExtractorService (Main Orchestrator)
+- **Entry Point**: Coordinates extraction workflows
+- **Auto-Extraction**: Combines schema selection + extraction
+- **Error Handling**: Graceful fallbacks and comprehensive logging
+- **Performance Tracking**: Request timing and token usage
+
+#### GeminiExtractor (LLM Integration)  
+- **Multi-turn Conversations**: Maintains context across retry attempts
+- **Error Feedback Loop**: Passes validation errors back to LLM for repair
+- **Template Method Pattern**: BaseExtractor with pluggable LLM backends
+- **Robust Validation**: JSON parsing + JSONSchema validation
+
+#### AutoDetectAgent (Schema Selection)
+- **Dual Selection Methods**: 
+  - Embedding-based (fast, scalable)
+  - LLM-based (slower, more intelligent)
+- **Metadata Generation**: Auto-creates titles, summaries, and slugs
+- **Fallback Strategy**: LLM selection if embedding fails
+
+#### EmbeddingManager (Vector Search)
+- **Pre-computed Embeddings**: text-embedding-004 model
+- **Persistent Storage**: NumPy arrays in `/data/schema_embeddings.npz`
+- **Automatic Rebuilding**: Detects schema changes and rebuilds index
+- **Cosine Similarity**: Fast semantic matching for schema selection
+
+### 3. Repository Layer (`app/repositories/schema_repo.py`)
+
+#### SchemaRepository (File-based Storage)
+- **Storage**: JSON files in `/schemas/` directory  
+- **In-memory Cache**: Fast access with lazy loading
+- **CRUD Operations**: Create, read, update, delete with persistence
+- **File Management**: Safe filename handling and atomic operations
+
+### 4. Configuration Layer (`app/config/prompts.yaml`)
+
+#### Prompt Engineering System
+- **Modular Prompts**: Separate prompts for extraction, retry, selection
+- **Model Configuration**: Per-operation model selection (Pro vs Flash)
+- **Cost Optimization**: Different models for different complexity levels
+
+```yaml
+extraction: gemini-2.5-pro (high accuracy)
+auto_detect: gemini-2.5-flash (fast selection)  
+metadata_generation: gemini-2.5-flash (lightweight)
+```
+
+## Data Flow Architecture
+
+### Standard Extraction Flow:
+```
+HTTP Request → API Validation → Service Layer → LLM Call → 
+JSON Parsing → Schema Validation → Response + Stats
+```
+
+### Auto-Extraction Flow:
+```
+HTTP Request → Schema Selection (Embedding/LLM) → 
+Validation → JSON Extraction → Multi-turn Retry → 
+Response + Performance Metrics
+```
+
+### Schema Creation Flow:
+```
+HTTP Request → Schema Validation → Auto-metadata Generation →
+File Persistence → Embedding Rebuild → Response
+```
+
+---
+
+
+# ITERATIONS
+
+# JSON Extraction Iteration 1 - LLM-Based Extraction with Retry Logic
 
 ## Problem Statement
 Extract structured JSON data from unstructured text using predefined JSON schemas for validation.
@@ -62,7 +196,7 @@ Attempt 3: LLM(text, schema) → Success/Failure
 
 ---
 
-# Design Evolution: Iteration 2
+# Design Evolution: Iteration 2 - Contextual Learning from Failures, Intelligent Schema Selection, Automated Metadata Generation
 
 ## Problems Solved
 
